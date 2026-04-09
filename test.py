@@ -19,5 +19,5 @@ s.sendall(msg_bytes)
 
 data = s.recv(4)
 response = struct.unpack("I", data)[0]
-
 s.close()
+test
