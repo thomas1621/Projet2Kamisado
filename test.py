@@ -3,7 +3,7 @@ import struct
 import json
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect(("172.17.89.219", 3000))
+s.connect(("172.17.10.46", 3000))
 
 msg = {
     "request": "subscribe",
@@ -20,4 +20,3 @@ s.sendall(msg_bytes)
 data = s.recv(4)
 response = struct.unpack("I", data)[0]
 s.close() 
-print("test")
