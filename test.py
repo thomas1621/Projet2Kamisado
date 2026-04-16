@@ -17,7 +17,11 @@ msg_bytes = json.dumps(msg).encode()
 s.sendall(struct.pack("I", len(msg_bytes)))
 s.sendall(msg_bytes)
 
-data = s.recv(512)
-response = json.loads(data.decode())
+size_data = s.recv(4)
+size = struct.unpack("I", size_data)[0]
+
+json_data = s.recv(size)
+response = json.loads(json_data.decode("utf-8"))
+
 print(response)
-s.close() 
+s.close()
