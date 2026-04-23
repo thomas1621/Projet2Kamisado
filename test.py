@@ -63,19 +63,28 @@ def get_random_move(state, tiles):
     current = state["current"]
 
     direction = -1 if current == 0 else 1
-
     possible_moves = []
 
     for (i, j, color) in tiles:
 
         for dj in [-1, 0, 1]:
-            ni = i + direction
-            nj = j + dj
+            ni, nj = i, j
 
-            if 0 <= ni < 8 and 0 <= nj < 8:
-                if board[ni][nj][1] is None:
-                    possible_moves.append([[i, j], [ni, nj]])
+            for _ in range(8):
+                ni += direction
+                nj += dj
 
+                # hors plateau
+                if not (0 <= ni < 8 and 0 <= nj < 8):
+                    break
+
+                # bloqué par une pièce
+                if board[ni][nj][1] is not None:
+                    break
+
+                possible_moves.append([[i, j], [ni, nj]])
+
+    print(possible_moves)
     return random.choice(possible_moves) if possible_moves else None
 def couleur_to_play(tiles, state):
     required_color = state["color"]
