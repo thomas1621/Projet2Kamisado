@@ -28,7 +28,7 @@ def send_message(sock,msg):
 send_message(s,{
     "request": "subscribe",
     "port": 8888,
-    "name": "Thomas",
+    "name": "anto ",
     "matricules": ["24068", "24104"]
 })
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -105,32 +105,20 @@ while True:
         send_message(client,{
             "response": "pong"
         })
-    if message.get("request") == "play":
+    elif message.get("request") == "play":
         state = message["state"]
         tiles = couleur_to_play(my_piece(state),state)
         move = get_random_move(state)
 
-    if move is None:
-        send_message(client, {
-            "response": "giveup"
-        })
-    else:
-        send_message(client, {
-            "response": "move",
-            "move": move,
-            "message": "Random move"
-        })
-    move = get_random_move(state)
-
-    if move is None:
-        send_message(client, {
-            "response": "giveup"
-        })
-    else:
-        send_message(client, {
-            "response": "move",
-            "move": move,
-            "message": "Random move"
-        })  
+        if move is None:
+            send_message(client, {
+                "response": "giveup"
+            })
+        else:
+            send_message(client, {
+                "response": "move",
+                "move": move,
+                "message": "Random move"
+            })
     client.close()
 s.close()
