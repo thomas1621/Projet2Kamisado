@@ -1,7 +1,8 @@
 import socket
 import struct
 import json
-
+import random
+liste_réponses_droles = ['aha ez','vasy vasy','cooooll','doucement NALA','accidentttttt','aller feinteeee','le prof est génial','laisse moi gagner','tu es vraiment trop fort ','aha super partie ','merci pour tout']
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect(("172.17.10.125", 3000))
 
@@ -56,39 +57,32 @@ def my_piece(state):
                     tiles.append((i, j, color))
 
     return tiles
-import random
 
-def get_random_move(state):
+def get_random_move(state, tiles):
     board = state["board"]
-    tiles = my_piece(state)
     current = state["current"]
 
-    direction = -1 if current == 0 else 1  # haut ou bas
+    direction = -1 if current == 0 else 1
 
     possible_moves = []
 
     for (i, j, color) in tiles:
 
-        # directions : tout droit, diagonale gauche, diagonale droite
         for dj in [-1, 0, 1]:
             ni = i + direction
             nj = j + dj
 
             if 0 <= ni < 8 and 0 <= nj < 8:
-                if board[ni][nj][1] is None:  # case libre
+                if board[ni][nj][1] is None:
                     possible_moves.append([[i, j], [ni, nj]])
 
-    if possible_moves:
-        return random.choice(possible_moves)
-    else:
-        return None
+    return random.choice(possible_moves) if possible_moves else None
 def couleur_to_play(tiles, state):
     required_color = state["color"]
 
     if required_color is None:
         return tiles
-
-    return [t for t in tiles if t[2] == required_color]
+    return [tile for tile in tiles if tile[2] == required_color]
     
 
 
@@ -107,8 +101,8 @@ while True:
         })
     elif message.get("request") == "play":
         state = message["state"]
-        tiles = couleur_to_play(my_piece(state),state)
-        move = get_random_move(state)
+        tiles = couleur_to_play(my_piece(state), state)
+        move = get_random_move(state, tiles)
 
         if move is None:
             send_message(client, {
@@ -118,7 +112,7 @@ while True:
             send_message(client, {
                 "response": "move",
                 "move": move,
-                "message": "Random move"
+                "message": random.choice(liste_réponses_droles)
             })
     client.close()
 s.close()
