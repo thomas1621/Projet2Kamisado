@@ -9,6 +9,7 @@ s.connect(("172.17.10.125", 3000))
 def recv_message(sock):
     size_data = sock.recv(4)
     if not size_data:
+        print("Connection closed by the server.")
         return None
     size = struct.unpack("I", size_data)[0]
     chunks = []
