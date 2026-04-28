@@ -1,9 +1,11 @@
 from bot import my_piece, get_random_move, couleur_to_play
+from typing import List, Tuple, Optional
+
 
 
 # ---------- OUTILS ----------
 
-def empty_board() -> list[list[list[tuple[str, str] | None]]]:
+def empty_board() -> List[List[List[Optional[Tuple[str, str]]]]]:
     return [[[None, None] for _ in range(8)] for _ in range(8)]
 
 def make_state(players=None, color=None, board=None, current=0):
