@@ -116,3 +116,4 @@ while True:
             })
     client.close()
 s.close()
+print("hello thomas")
