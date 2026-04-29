@@ -35,17 +35,16 @@ def test_couleur_to_play():
     piece_to_play=couleur_to_play(piece,state)
 
     assert piece_to_play == [(5, 2, "red")]
-def test_get_random_move_no_moves():
+def test_get_random_move():
     board = empty_board()
-    tiles = [(7, 0, "red")]
+    board[7][0] = [None, ("red", "dark")]
 
-    state = make_state(board=board, current=0)
+    state= make_state(board=board, current=0)
+    tiles = my_piece(state)
+    
+    move = get_random_move(state, tiles)
 
-    move = get_random_move(state,tiles)
-
-    assert move is None
-
-
+    assert move is not None
 
 
 
