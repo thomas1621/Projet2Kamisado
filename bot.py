@@ -139,3 +139,5 @@ def run_bot():
 
         client.close()
     s.close()
+if __name__ == "__main__":
+    run_bot()
