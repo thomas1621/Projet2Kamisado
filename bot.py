@@ -1,7 +1,9 @@
 import socket
 import struct
 import json
+import copy
 import random
+
 
 liste_réponses_droles = [
     'aha ez',
@@ -16,6 +18,7 @@ liste_réponses_droles = [
     'aha super partie ',
     'merci pour tout'
 ]
+
 
 def recv_message(sock):
     size_data = sock.recv(4)
@@ -32,8 +35,7 @@ def recv_message(sock):
         chunks.append(data)
         received += len(data)
 
-    full_data = b''.join(chunks)
-    return json.loads(full_data.decode("utf-8"))
+    return json.loads(b''.join(chunks).decode("utf-8"))
 
 
 def send_message(sock, msg):
@@ -41,68 +43,176 @@ def send_message(sock, msg):
     sock.sendall(struct.pack("I", len(msg_bytes)))
     sock.sendall(msg_bytes)
 
-
-def my_piece(state):
+def actions(state):
     board = state["board"]
     current = state["current"]
 
     my_kind = "dark" if current == 0 else "light"
+    direction = -1 if current == 0 else 1
 
     tiles = []
 
     for i in range(8):
         for j in range(8):
-            cell = board[i][j]
-            tile = cell[1]
-
-            if tile is not None:
-                color, kind = tile
+            cell = board[i][j][1]
+            if cell is not None:
+                color, kind = cell
                 if kind == my_kind:
                     tiles.append((i, j, color))
 
-    return tiles
+    required_color = state["color"]
 
+    if required_color is not None:
+        tiles = [t for t in tiles if t[2] == required_color]
 
-def get_random_move(state, tiles):
-    board = state["board"]
-    current = state["current"]
-
-    direction = -1 if current == 0 else 1
-
-    possible_moves = []
+    moves = []
 
     for (i, j, color) in tiles:
-
         for dj in [-1, 0, 1]:
+
             ni = i + direction
             nj = j + dj
 
-            if 0 <= ni < 8 and 0 <= nj < 8:
-                if board[ni][nj][1] is None:
-                    possible_moves.append([[i, j], [ni, nj]])
+            while 0 <= ni < 8 and 0 <= nj < 8:
 
-    return random.choice(possible_moves) if possible_moves else None
+                if board[ni][nj][1] is not None:
+                    break
 
-def couleur_to_play(tiles, state):
-    required_color = state["color"]
+                moves.append([[i, j], [ni, nj]])
 
-    if required_color is None:
-        return tiles
+                ni += direction
+                nj += dj
 
-    return [tile for tile in tiles if tile[2] == required_color]
+    return moves
+
+def result(state, move):
+    new_state = copy.deepcopy(state)
+    board = new_state["board"]
+
+    (i, j), (ni, nj) = move
+
+    piece = board[i][j][1]
+
+    board[i][j][1] = None
+    board[ni][nj][1] = piece
+
+    new_state["color"] = board[ni][nj][0]
+    new_state["current"] = 1 - new_state["current"]
+
+    return new_state
+
+
+def is_winner(state):
+    board = state["board"]
+
+    for j in range(8):
+        cell = board[0][j][1]
+        if cell is not None:
+            color, kind = cell
+            if kind == "dark":
+                return True
+
+    for j in range(8):
+        cell = board[7][j][1]
+        if cell is not None:
+            color, kind = cell
+            if kind == "light":
+                return True
+
+    return False
+
+def evaluate(state):
+    if is_winner(state):
+        return 10000 if state["current"] == 1 else -10000
+
+    board = state["board"]
+    score = 0
+
+    for i in range(8):
+        for j in range(8):
+            cell = board[i][j][1]
+
+            if cell is not None:
+                color, kind = cell
+
+                if kind == "dark":
+                    score += (7 - i) * 10
+                    if j == 0 or j == 7:
+                        score += 3
+                else:
+                    score -= i * 10
+
+    return score
+
+
+
+def minimax(state, depth, maximizing):
+    if depth == 0 or is_winner(state):
+        return evaluate(state)
+
+    moves = actions(state)
+
+    if not moves:
+        return evaluate(state)
+
+    if maximizing:
+        best = -999999
+        for move in moves:
+            new_state = result(state, move)
+            score = minimax(new_state, depth - 1, False)
+            best = max(best, score)
+        return best
+
+    else:
+        best = 999999
+        for move in moves:
+            new_state = result(state, move)
+            score = minimax(new_state, depth - 1, True)
+            best = min(best, score)
+        return best
+
+
+def best_action(state):
+    moves = actions(state)
+
+    best_score = -999999
+    best_move = None
+
+    for move in moves:
+        new_state = result(state, move)
+
+        score = minimax(new_state, 1, False)  
+
+        (i, j), (ni, nj) = move
+
+        if j == nj:
+            score += 5
+        else:
+            score -= 2
+
+        if is_winner(new_state):
+            score += 100000
+
+        if score > best_score:
+            best_score = score
+            best_move = move
+
+    return best_move
+
 
 def run_bot():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect(("172.17.10.125", 3000))
+    s.connect(("192.168.129.65", 3000))
 
     send_message(s, {
         "request": "subscribe",
-        "port": 8888,
-        "name": "anto ",
-        "matricules": ["24068", "24104"]
+        "port": 8889,
+        "name": "bot_minimax",
+        "matricules": ["24068"]
     })
+
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind(("0.0.0.0", 8888))
+    server.bind(("0.0.0.0", 8889))
     server.listen()
 
     while True:
@@ -113,23 +223,16 @@ def run_bot():
             client.close()
             continue
 
-        print(message)
-
         if message.get("request") == "ping":
-            send_message(client, {
-                "response": "pong"
-            })
+            send_message(client, {"response": "pong"})
 
         elif message.get("request") == "play":
             state = message["state"]
 
-            tiles = couleur_to_play(my_piece(state), state)
-            move = get_random_move(state, tiles)
+            move = best_action(state)
 
             if move is None:
-                send_message(client, {
-                    "response": "giveup"
-                })
+                send_message(client, {"response": "giveup"})
             else:
                 send_message(client, {
                     "response": "move",
@@ -138,6 +241,9 @@ def run_bot():
                 })
 
         client.close()
+
     s.close()
+
+
 if __name__ == "__main__":
     run_bot()
