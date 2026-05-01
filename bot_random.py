@@ -99,16 +99,16 @@ def couleur_to_play(tiles, state):
 
 def run_bot():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect(("192.168.129.65", 3000))
+    s.connect(("192.168.129.19", 3000))
 
     send_message(s, {
         "request": "subscribe",
-        "port": 8888,
-        "name": "random ",
+        "port": 8889,
+        "name": "nullll",
         "matricules": ["24104"]
     })
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind(("0.0.0.0", 8888))
+    server.bind(("0.0.0.0", 8889))
     server.listen()
 
     while True:
@@ -131,13 +131,7 @@ def run_bot():
 
             tiles = couleur_to_play(my_piece(state), state)
             move = get_random_move(state, tiles)
-
-            if move is None:
-                send_message(client, {
-                    "response": "giveup"
-                })
-            else:
-                send_message(client, {
+            send_message(client, {
                     "response": "move",
                     "move": move,
                     "message": random.choice(liste_réponses_droles)

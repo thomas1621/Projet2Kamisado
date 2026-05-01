@@ -1,24 +1,23 @@
 import socket
 import struct
 import json
-import copy
 import random
+import time
 
+MON_NOM = "bot_minimax"
+MON_MATRICULE = "24068"
+SERVEUR_IP = "192.168.129.19"
 
-liste_réponses_droles = [
-    'aha ez',
-    'vasy vasy',
-    'cooooll',
-    'doucement NALA',
-    'accidentttttt',
-    'aller feinteeee',
-    'le prof est génial',
-    'laisse moi gagner',
-    'tu es vraiment trop fort ',
-    'aha super partie ',
-    'merci pour tout'
+TEMPS_MAX = 2.8
+
+liste_reponses_droles = [
+    'aha ez','vasy vasy','cooooll','doucement NALA',
+    'accidentttttt','aller feinteeee','le prof est génial',
+    'laisse moi gagner','tu es vraiment trop fort ',
+    'aha super partie ','merci pour tout'
 ]
 
+# ---------------- NETWORK ----------------
 
 def recv_message(sock):
     size_data = sock.recv(4)
@@ -27,15 +26,14 @@ def recv_message(sock):
 
     size = struct.unpack("I", size_data)[0]
 
-    chunks = []
-    received = 0
+    data = b""
+    while len(data) < size:
+        packet = sock.recv(1024)
+        if not packet:
+            break
+        data += packet
 
-    while received < size:
-        data = sock.recv(1024)
-        chunks.append(data)
-        received += len(data)
-
-    return json.loads(b''.join(chunks).decode("utf-8"))
+    return json.loads(data.decode("utf-8"))
 
 
 def send_message(sock, msg):
@@ -43,183 +41,348 @@ def send_message(sock, msg):
     sock.sendall(struct.pack("I", len(msg_bytes)))
     sock.sendall(msg_bytes)
 
-def actions(state):
+# ---------------- PLAYER ----------------
+
+def my_kind(state):
+    my_index = state["players"].index(MON_NOM)
+    return "dark" if my_index == 0 else "light"
+
+def opponent(kind):
+    return "light" if kind == "dark" else "dark"
+
+# ---------------- MOVES ----------------
+
+def action(state, kind):
     board = state["board"]
-    current = state["current"]
-
-    my_kind = "dark" if current == 0 else "light"
-    direction = -1 if current == 0 else 1
-
-    tiles = []
-
-    for i in range(8):
-        for j in range(8):
-            cell = board[i][j][1]
-            if cell is not None:
-                color, kind = cell
-                if kind == my_kind:
-                    tiles.append((i, j, color))
-
     required_color = state["color"]
 
-    if required_color is not None:
-        tiles = [t for t in tiles if t[2] == required_color]
+    directions = [(-1,0),(-1,-1),(-1,1)] if kind=="dark" else [(1,0),(1,1),(1,-1)]
 
     moves = []
 
-    for (i, j, color) in tiles:
-        for dj in [-1, 0, 1]:
+    for i in range(8):
+        for j in range(8):
 
-            ni = i + direction
-            nj = j + dj
+            cell = board[i][j][1]
+            if cell is None:
+                continue
 
-            while 0 <= ni < 8 and 0 <= nj < 8:
+            if cell[1] != kind:
+                continue
 
-                if board[ni][nj][1] is not None:
-                    break
+            if required_color is not None and cell[0] != required_color:
+                continue
 
-                moves.append([[i, j], [ni, nj]])
+            for di,dj in directions:
+                ni, nj = i+di, j+dj
 
-                ni += direction
-                nj += dj
+                while 0<=ni<8 and 0<=nj<8:
+                    if board[ni][nj][1] is not None:
+                        break
+
+                    moves.append([[i,j],[ni,nj]])
+                    ni += di
+                    nj += dj
 
     return moves
 
-def result(state, move):
-    new_state = copy.deepcopy(state)
-    board = new_state["board"]
+# ---------------- PLAY ----------------
 
-    (i, j), (ni, nj) = move
+def play_move(state, move):
+    (i,j),(ni,nj)=move
 
-    piece = board[i][j][1]
+    piece = state["board"][i][j][1]
+    state["board"][i][j][1]=None
+    state["board"][ni][nj][1]=piece
 
-    board[i][j][1] = None
-    board[ni][nj][1] = piece
+    old_color = state["color"]
+    state["color"] = state["board"][ni][nj][0]
 
-    new_state["color"] = board[ni][nj][0]
-    new_state["current"] = 1 - new_state["current"]
+    return old_color, piece
 
-    return new_state
+def undo_move(state, move, old_color, piece):
+    (i,j),(ni,nj)=move
 
+    state["board"][ni][nj][1]=None
+    state["board"][i][j][1]=piece
+    state["color"]=old_color
 
-def is_winner(state):
-    board = state["board"]
+# ---------------- HEURISTIQUES ----------------
 
-    for j in range(8):
-        cell = board[0][j][1]
-        if cell is not None:
-            color, kind = cell
-            if kind == "dark":
-                return True
+def is_winning_move(move, kind):
+    end_row = move[1][0]
+    return (kind=="dark" and end_row==0) or (kind=="light" and end_row==7)
 
-    for j in range(8):
-        cell = board[7][j][1]
-        if cell is not None:
-            color, kind = cell
-            if kind == "light":
-                return True
+def score_move(move, kind):
+    (i,j),(ni,nj)=move
 
-    return False
+    if is_winning_move(move, kind):
+        return 10000
 
-def evaluate(state):
-    if is_winner(state):
-        return 10000 if state["current"] == 1 else -10000
+    if kind=="dark":
+        avance = i - ni
+        progress = 7 - ni
+    else:
+        avance = ni - i
+        progress = ni
 
-    board = state["board"]
+    return avance*15 + progress*10
+
+def sort_moves(moves, kind):
+    return sorted(moves, key=lambda m: score_move(m, kind), reverse=True)
+
+# ---------------- COLOR STRATEGY ----------------
+
+def evaluate_color_control(state, me, opp):
+    if state["color"] is None:
+        return 0
+
+    forced_color = state["color"]
+
+    my_moves = []
+    opp_moves = []
+
+    for m in action(state, me):
+        (i,j),(ni,nj)=m
+        if state["board"][ni][nj][0] == forced_color:
+            my_moves.append(m)
+
+    for m in action(state, opp):
+        (i,j),(ni,nj)=m
+        if state["board"][ni][nj][0] == forced_color:
+            opp_moves.append(m)
+
     score = 0
 
-    for i in range(8):
-        for j in range(8):
-            cell = board[i][j][1]
+    score += len(my_moves) * 30
+    score -= len(opp_moves) * 30
 
-            if cell is not None:
-                color, kind = cell
+    for m in opp_moves:
+        if is_winning_move(m, opp):
+            score -= 5000
 
-                if kind == "dark":
-                    score += (7 - i) * 10
-                    if j == 0 or j == 7:
-                        score += 3
-                else:
-                    score -= i * 10
+    for m in my_moves:
+        if is_winning_move(m, me):
+            score += 5000
 
     return score
 
+# ---------------- EVALUATION ----------------
 
+def evaluate(state, me, opp):
+    board = state["board"]
 
-def minimax(state, depth, maximizing):
-    if depth == 0 or is_winner(state):
-        return evaluate(state)
+    for j in range(8):
+        if board[0][j][1] and board[0][j][1][1]=="dark":
+            return 100000 if me=="dark" else -100000
+        if board[7][j][1] and board[7][j][1][1]=="light":
+            return 100000 if me=="light" else -100000
 
-    moves = actions(state)
+    score = 0
+    centre = [(3,3),(3,4),(4,3),(4,4)]
+
+    for i in range(8):
+        for j in range(8):
+
+            cell = board[i][j][1]
+            if cell is None:
+                continue
+
+            kind = cell[1]
+            value = 1 if kind==me else -1
+
+            progress = (7-i) if kind=="dark" else i
+            score += value * progress * 10
+
+            if (i,j) in centre:
+                score += value * 5
+
+    score += len(action(state, me)) * 2
+    score -= len(action(state, opp)) * 2
+
+    score += evaluate_color_control(state, me, opp)
+
+    return score
+
+# ---------------- ANTI BLUNDER ----------------
+
+def opponent_can_win(state, opp):
+    for m in action(state, opp):
+        if is_winning_move(m, opp):
+            return True
+    return False
+
+def opponent_can_win_in_two(state, opp, me):
+    for m in action(state, opp):
+        old_color, piece = play_move(state, m)
+
+        if is_winning_move(m, opp):
+            undo_move(state, m, old_color, piece)
+            return True
+
+        for m2 in action(state, me):
+            old_color2, piece2 = play_move(state, m2)
+
+            for m3 in action(state, opp):
+                if is_winning_move(m3, opp):
+                    undo_move(state, m2, old_color2, piece2)
+                    undo_move(state, m, old_color, piece)
+                    return True
+
+            undo_move(state, m2, old_color2, piece2)
+
+        undo_move(state, m, old_color, piece)
+
+    return False
+
+# ---------------- NEGAMAX ----------------
+
+def negamax(state, depth, kind, me, opp, start, alpha, beta):
+
+    if time.time() - start > TEMPS_MAX:
+        return evaluate(state, me, opp), True
+
+    moves = action(state, kind)
 
     if not moves:
-        return evaluate(state)
+        return evaluate(state, me, opp), False
 
-    if maximizing:
-        best = -999999
-        for move in moves:
-            new_state = result(state, move)
-            score = minimax(new_state, depth - 1, False)
-            best = max(best, score)
-        return best
+    moves = sort_moves(moves, kind)
+    moves = moves[:15]
 
-    else:
-        best = 999999
-        for move in moves:
-            new_state = result(state, move)
-            score = minimax(new_state, depth - 1, True)
-            best = min(best, score)
-        return best
-
-
-def best_action(state):
-    moves = actions(state)
-
-    best_score = -999999
-    best_move = None
+    best = -float("inf")
 
     for move in moves:
-        new_state = result(state, move)
 
-        score = minimax(new_state, 1, False)  
+        if is_winning_move(move, kind):
+            return 100000, False
 
-        (i, j), (ni, nj) = move
+        old_color, piece = play_move(state, move)
 
-        if j == nj:
-            score += 5
-        else:
-            score -= 2
+        score, timeout = negamax(
+            state,
+            depth+1,
+            opponent(kind),
+            me,
+            opp,
+            start,
+            -beta,
+            -alpha
+        )
 
-        if is_winner(new_state):
-            score += 100000
+        score = -score
+        undo_move(state, move, old_color, piece)
 
-        if score > best_score:
-            best_score = score
-            best_move = move
+        if timeout:
+            return best, True
+
+        if score > best:
+            best = score
+
+        alpha = max(alpha, score)
+
+        if alpha >= beta:
+            break
+
+    return best, False
+
+# ---------------- BEST ACTION ----------------
+
+def best_action(state, kind):
+
+    me = kind
+    opp = opponent(kind)
+
+    start = time.time()
+
+    moves = action(state, kind)
+    if not moves:
+        return None
+
+    moves = sort_moves(moves, kind)
+
+    for m in moves:
+        if is_winning_move(m, kind):
+            return m
+
+    safe_moves = []
+
+    for m in moves:
+        old_color, piece = play_move(state, m)
+
+        if not opponent_can_win(state, opp) and not opponent_can_win_in_two(state, opp, me):
+            safe_moves.append(m)
+
+        undo_move(state, m, old_color, piece)
+
+    if safe_moves:
+        moves = safe_moves
+
+    moves = moves[:20]
+
+    best_move = moves[0]
+    best_score = -float("inf")
+
+    depth = 1
+
+    while True:
+
+        if time.time() - start > TEMPS_MAX:
+            break
+
+        for m in moves:
+
+            old_color, piece = play_move(state, m)
+
+            score, timeout = negamax(
+                state,
+                depth,
+                opp,
+                me,
+                opp,
+                start,
+                -float("inf"),
+                float("inf")
+            )
+
+            score = -score
+            undo_move(state, m, old_color, piece)
+
+            if timeout:
+                break
+
+            if score > best_score:
+                best_score = score
+                best_move = m
+
+        depth += 1
 
     return best_move
 
+# ---------------- BOT ----------------
 
 def run_bot():
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect(("192.168.129.65", 3000))
+
+    s = socket.socket()
+    s.connect((SERVEUR_IP, 3000))
 
     send_message(s, {
         "request": "subscribe",
-        "port": 8889,
-        "name": "bot_minimax",
-        "matricules": ["24068"]
+        "port": 8888,
+        "name": MON_NOM,
+        "matricules": [MON_MATRICULE]
     })
 
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind(("0.0.0.0", 8889))
-    server.listen()
+    server = socket.socket()
+    server.bind(("0.0.0.0", 8888))
+    server.listen(1)
 
     while True:
-        client, addr = server.accept()
+
+        client, _ = server.accept()
         message = recv_message(client)
 
-        if message is None:
+        if not message:
             client.close()
             continue
 
@@ -227,23 +390,22 @@ def run_bot():
             send_message(client, {"response": "pong"})
 
         elif message.get("request") == "play":
+
             state = message["state"]
+            kind = my_kind(state)
 
-            move = best_action(state)
+            move = best_action(state, kind)
 
-            if move is None:
+            if not move:
                 send_message(client, {"response": "giveup"})
             else:
                 send_message(client, {
                     "response": "move",
                     "move": move,
-                    "message": random.choice(liste_réponses_droles)
+                    "message": random.choice(liste_reponses_droles)
                 })
 
         client.close()
-
-    s.close()
-
 
 if __name__ == "__main__":
     run_bot()
