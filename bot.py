@@ -270,6 +270,7 @@ def negamax(state, kind, me, opp, start, alpha, beta):
         if winning_move(move, kind):
             return 100000, False
 
+        # ✔️ on joue le coup
         old_color, piece = play_move(state, move)
 
         score, timeout = negamax(
@@ -283,6 +284,8 @@ def negamax(state, kind, me, opp, start, alpha, beta):
         )
 
         score = -score
+
+        # ✔️ on annule le coup
         undo_move(state, move, old_color, piece)
 
         if timeout:
@@ -298,9 +301,65 @@ def negamax(state, kind, me, opp, start, alpha, beta):
 
     return best, False
 
-# ---------------- BEST MOVE ----------------
-
 def best_action(state, kind):
+
+    me = kind
+    opp = opponent(kind)
+
+    start = time.time()
+
+    moves = action(state, kind)
+
+    if not moves:
+        return None
+
+    moves = sort_moves(moves, kind)
+
+    # coup gagnant direct
+    for m in moves:
+        if winning_move(m, kind):
+            return m
+
+    best_move = moves[0]
+    best_score = -float("inf")
+
+    depth = 1
+
+    while True:
+
+        if time.time() - start > TEMPS_MAX:
+            break
+
+        for m in moves:
+
+            # ✔️ jouer le coup
+            old_color, piece = play_move(state, m)
+
+            score, timeout = negamax(
+                state,
+                opponent(kind),
+                me,
+                opp,
+                start,
+                -float("inf"),
+                float("inf")
+            )
+
+            score = -score
+
+            # ✔️ annuler
+            undo_move(state, m, old_color, piece)
+
+            if timeout:
+                break
+
+            if score > best_score:
+                best_score = score
+                best_move = m
+
+        depth += 1
+
+    return best_move
 
     me = kind
     opp = opponent(kind)
