@@ -4,9 +4,9 @@ import json
 import random
 import time
 
-MON_NOM = "bot_minimax"
+MON_NOM = "Thomas "
 MON_MATRICULE = "24068"
-SERVEUR_IP = "192.168.129.19"
+SERVEUR_IP = "192.168.129.14"
 
 TEMPS_MAX = 2.8
 
@@ -301,10 +301,10 @@ def run_bot():
     })
     server = socket.socket()
     server.bind(("0.0.0.0", 8888))
-    server.listen(1)
+    server.listen()
 
     while True:
-        client, _ = server.accept()
+        client, addr = server.accept()
         message = recv_message(client)
         if not message:
             client.close()
