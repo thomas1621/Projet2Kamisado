@@ -48,7 +48,7 @@ def opponent(kind):
 
 # ---------------- MOVES ----------------
 
-def action(state, kind):
+def actions(state, kind):
     board = state["board"]
     required_color = state["color"]
     directions = [(-1,0),(-1,-1),(-1,1)] if kind=="dark" else [(1,0),(1,1),(1,-1)]
@@ -114,17 +114,17 @@ def sort_moves(moves, kind):
 
 def forced_sequence_score(state, me, opp):
     score = 0
-    my_moves = action(state, me)
+    my_moves = actions(state, me)
     for m in my_moves:
         old_color, piece = play_move(state, m)
-        opp_moves = action(state, opp)
+        opp_moves = actions(state, opp)
         if len(opp_moves) == 0:
             undo_move(state, m, old_color, piece)
             return 10000
         if len(opp_moves) == 1:
             m2 = opp_moves[0]
             old_color2, piece2 = play_move(state, m2)
-            for m3 in action(state, me):
+            for m3 in actions(state, me):
                 if winning_move(m3, me):
                     undo_move(state, m2, old_color2, piece2)
                     undo_move(state, m, old_color, piece)
@@ -156,8 +156,8 @@ def evaluate(state, me, opp):
             progress = (7 - i) if kind == "dark" else i
             score += value * progress * 10
     # mobilité
-    my_actions = action(state, me)
-    opp_actions = action(state, opp)
+    my_actions = actions(state, me)
+    opp_actions = actions(state, opp)
     score += len(my_actions) * 3
     score -= len(opp_actions) * 3
     if len(opp_actions) <= 2:
@@ -202,7 +202,7 @@ def negamax(state, kind, me, opp, start, alpha, beta, depth):
     if depth == 0:
         return evaluate(state, me, opp), False
 
-    moves = action(state, kind)
+    moves = actions(state, kind)
     if not moves:
         return evaluate(state, me, opp), False
 
@@ -241,7 +241,7 @@ def best_action(state, kind):
     me = kind
     opp = opponent(kind)
     start = time.time()
-    moves = action(state, kind)
+    moves = actions(state, kind)
     if not moves:
         return None
     moves = sort_moves(moves, kind)
