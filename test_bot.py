@@ -16,11 +16,6 @@ from bot import (
     winning_move,
 )
 
-
-# =========================================================
-# FAKE SOCKETS
-# =========================================================
-
 class FakeSocket:
     def __init__(self, chunks):
         self.chunks = chunks
@@ -32,10 +27,6 @@ class FakeSocket:
     def sendall(self, data):
         self.sent += data
 
-
-# =========================================================
-# BOARD HELPERS
-# =========================================================
 
 def empty_board():
     return [[[None, None] for _ in range(8)] for _ in range(8)]
@@ -50,10 +41,6 @@ def make_state(board=None, current=0, color=None, players=None):
     }
 
 
-# =========================================================
-# 1. COMMUNICATION FULL COVERAGE
-# =========================================================
-
 def test_recv_send_full():
     msg = {"request": "ping"}
     raw = json.dumps(msg).encode()
@@ -66,10 +53,6 @@ def test_recv_send_full():
     send_message(s2, {"a": 1})
     assert b"a" in s2.sent
 
-
-# =========================================================
-# 2. ACTIONS (all branches)
-# =========================================================
 
 def test_actions_all_cases():
     board = empty_board()
@@ -91,10 +74,6 @@ def test_actions_all_cases():
     assert actions(state2, "dark") == []
 
 
-# =========================================================
-# 3. MOVE SYSTEM FULL PATH
-# =========================================================
-
 def test_play_undo_full():
     board = empty_board()
     board[6][3] = [None, ("red", "dark")]
@@ -110,18 +89,13 @@ def test_play_undo_full():
     assert state["board"][6][3][1] is not None
 
 
-# =========================================================
-# 4. WIN CONDITIONS BOTH SIDES
-# =========================================================
+
 
 def test_winning_moves():
     assert winning_move([[1, 1], [0, 1]], "dark")
     assert winning_move([[6, 1], [7, 1]], "light")
 
 
-# =========================================================
-# 5. EVALUATION (forces ALL branches)
-# =========================================================
 
 def test_evaluate_max_coverage():
     board = empty_board()
@@ -142,11 +116,6 @@ def test_evaluate_max_coverage():
     val = evaluate(state2, "dark", "light")
     assert isinstance(val, int)
 
-
-# =========================================================
-# 6. FORCED SEQUENCE (all paths)
-# =========================================================
-
 def test_forced_sequence_full():
     board = empty_board()
     board[6][3] = [None, ("red", "dark")]
@@ -155,11 +124,6 @@ def test_forced_sequence_full():
 
     score = forced_sequence_score(state, "dark", "light")
     assert isinstance(score, int)
-
-
-# =========================================================
-# 7. NEGAMAX (deep + cutoff + base)
-# =========================================================
 
 def test_negamax_full():
     board = empty_board()
@@ -176,9 +140,6 @@ def test_negamax_full():
     assert isinstance(s2, int)
 
 
-# =========================================================
-# 8. BEST ACTION (force multiple branches)
-# =========================================================
 
 def test_best_action_full():
     board = empty_board()
@@ -193,18 +154,13 @@ def test_best_action_full():
     assert move is None or isinstance(move, list)
 
 
-# =========================================================
-# 9. UTIL
-# =========================================================
 
 def test_opponent_func():
     assert opponent("dark") == "light"
     assert opponent("light") == "dark"
 
 
-# =========================================================
-# 10. STRESS COVERAGE BOOST (important for 90%+)
-# =========================================================
+
 
 def test_stress_actions_many():
     board = empty_board()
@@ -223,10 +179,6 @@ def test_stress_actions_many():
         actions(state, "dark")
         actions(state, "light")
 
-
-# =========================================================
-# 11. SOCKET EDGE CASES
-# =========================================================
 
 def test_recv_empty():
     sock = FakeSocket([])
