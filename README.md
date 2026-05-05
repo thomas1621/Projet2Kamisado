@@ -1,5 +1,6 @@
 AUTEUR: 
 BERTHOLET Thomas  : 24068
+
 MENET     Antonin : 24104
 
 Ce projet consiste à développer un bot capable de jouer au Kamisado efficacement dans un temps limité. L’objectif est de mettre en place une stratégie simple, mais cohérente, permettant de prendre l’avantage sur l’adversaire.
@@ -38,9 +39,13 @@ Pour appliquer ces principes, le bot simule plusieurs coups et anticipe les rép
 Bibliothèques utilisées :
 
 socket : communication avec le serveur
+
 json : échange des données de jeu
+
 struct : format des messages réseau
+
 time : gestion du temps de calcul
+
 random : messages aléatoires
 
 Améliorations possibles :
