@@ -99,7 +99,7 @@ def couleur_to_play(tiles, state):
 
 def run_bot():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect(("192.168.129.19", 3000))
+    s.connect(("172.20.10.2", 3000))
 
     send_message(s, {
         "request": "subscribe",
